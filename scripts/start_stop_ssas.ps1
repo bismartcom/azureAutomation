@@ -28,8 +28,35 @@ $StartDate=(GET-DATE)
 ########################################################
 Write-Verbose -Message 'Connecting to Azure'
   
-Import-module 'az.accounts'
-Connect-AzAccount -Identity
+# Name of the Azure Run As connection
+$ConnectionName = 'AzureRunAsConnection'
+try
+{
+    # Get the connection properties
+    $ServicePrincipalConnection = Get-AutomationConnection -Name $ConnectionName      
+   
+    'Log in to Azure...'
+    $null = Connect-AzAccount `
+        -ServicePrincipal `
+        -TenantId $ServicePrincipalConnection.TenantId `
+        -ApplicationId $ServicePrincipalConnection.ApplicationId `
+        -CertificateThumbprint $ServicePrincipalConnection.CertificateThumbprint 
+}
+catch 
+{
+    if (!$ServicePrincipalConnection)
+    {
+        # You forgot to turn on 'Create Azure Run As account' 
+        $ErrorMessage = "Connection $ConnectionName not found."
+        throw $ErrorMessage
+    }
+    else
+    {
+        # Something else went wrong
+        Write-Error -Message $_.Exception.Message
+        throw $_.Exception
+    }
+}
 ########################################################
   
  

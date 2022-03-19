@@ -30,9 +30,35 @@ $StartDate=(GET-DATE)
 ########################################################
 Write-Verbose -Message 'Connecting to Azure'
   
-Import-module 'az.accounts'
-Connect-AzAccount -Identity
-
+# Name of the Azure Run As connection
+$ConnectionName = 'AzureRunAsConnection'
+try
+{
+    # Get the connection properties
+    $ServicePrincipalConnection = Get-AutomationConnection -Name $ConnectionName      
+   
+    'Log in to Azure...'
+    $null = Connect-AzAccount `
+        -ServicePrincipal `
+        -TenantId $ServicePrincipalConnection.TenantId `
+        -ApplicationId $ServicePrincipalConnection.ApplicationId `
+        -CertificateThumbprint $ServicePrincipalConnection.CertificateThumbprint 
+}
+catch 
+{
+    if (!$ServicePrincipalConnection)
+    {
+        # You forgot to turn on 'Create Azure Run As account' 
+        $ErrorMessage = "Connection $ConnectionName not found."
+        throw $ErrorMessage
+    }
+    else
+    {
+        # Something else went wrong
+        Write-Error -Message $_.Exception.Message
+        throw $_.Exception
+    }
+}
 ########################################################
   
 ########################################################
@@ -40,7 +66,7 @@ Connect-AzAccount -Identity
 ########################################################
 
 $database = Get-AzSqlDatabase –ResourceGroupName $rg –ServerName $ServerName –DatabaseName $DwhName
-Write-Output "Before script Status $($database.Status)"
+Write-Output "Actual Status $($database.Status)"
 #Suspend-AzSqlDatabase -ResourceGroupName $rg -ServerName $ServerName -DatabaseName $DwhName
 #Write-Output "end"
 #pause dwh
@@ -50,7 +76,6 @@ Write-Output "Before script Status $($database.Status)"
 if ( ($Action -eq 'start' ) ) 
 {
     $null = Resume-AzSqlDatabase -ResourceGroupName $rg -ServerName $ServerName -DatabaseName $DwhName
-
 }
 
 
@@ -58,8 +83,6 @@ if ( ($Action -eq 'pause' ))
 {
     $null = Suspend-AzSqlDatabase -ResourceGroupName $rg -ServerName $ServerName -DatabaseName $DwhName
 }
-
-Write-Output "After script Status $($database.Status)"
 
 
  
